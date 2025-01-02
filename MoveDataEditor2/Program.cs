@@ -1,6 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-
+﻿
 //It's just occured to me that we should probably be using the ep file for this
 //hm, actually we need to use both the data and ep files, huh
 //maybe we can make it depend on how large the value entered is?
@@ -17,6 +15,7 @@ if (DataFilePath == null)
     return;
 }
 
+//trims quotes from path if there are any
 DataFilePath = DataFilePath.Trim('"');
 Console.WriteLine(DataFilePath);
 
@@ -62,6 +61,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
         {
             Console.WriteLine($"Negative ID entered, try entering a move ID that exists/is positive");
         }
+       
         fs.Seek(CalculatedOffset + 0x120004, SeekOrigin.Begin);
     }
     catch (Exception e)
@@ -76,8 +76,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
     fs.ReadExactly(AddressBuffer, 0, 3);
 
     //This just reads the address to the Console so we can verify that it's working
-    string HexBuffer = Convert.ToHexString(AddressBuffer);
-    Console.WriteLine(HexBuffer);
+    //string HexBuffer = Convert.ToHexString(AddressBuffer);
+    //Console.WriteLine(HexBuffer);
     //IT WORKS YEAHHHHHHHHHHHHH
 
 
@@ -88,7 +88,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
     //I wanted to use the hex version of the AddressBuffer as an offset, but I couldn't figure it out
     //so this'll have to do
 
-    HexBuffer = Convert.ToHexString(AddressBuffer);
+    string HexBuffer = Convert.ToHexString(AddressBuffer);
 
     int FinalOffset = int.Parse(HexBuffer, System.Globalization.NumberStyles.HexNumber);
     Console.WriteLine(FinalOffset);
@@ -175,6 +175,6 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
 
     
     UniqueKeyFrames.ForEach(i => Console.WriteLine(i + "," ));
-    //Console.WriteLine($"Found the first float!!!!!");
+    
 
 }
