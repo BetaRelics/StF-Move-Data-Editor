@@ -176,7 +176,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         }
 
         //following the keyframe list, there's typically some bytes that are equal to very large/small integers
-        //by checking the float's absolute value against 500, we ensure we aren't accidentally reading those
+        //by checking the float's absolute value against 400, we ensure we aren't accidentally reading those
         //logically, no move should ever be 400 frames long, so this solution shouldn't be an issue
         //there's definitely a better way to do this though
         if (Math.Abs(ConvertedBuffer) > 400)
@@ -227,6 +227,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         catch
         {
             Console.WriteLine($"something went wrong, failed to read/replace keyframe");
+            NewKeyFramesList.Remove(CurrentKeyFrame);
             --CurrentKeyFrame;
         }
     }
@@ -241,10 +242,14 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     ConvertedBuffer = 0;
     CurrentKeyFrame = 0;
     
+
+    
     foreach (int NewKeyFrameForReplace in NewKeyFramesList)
     {
         try
         {
+            fs.Position = FloatStartPos;
+            ConvertedBuffer = 1;
             while ((ConvertedBuffer % 1) < float.Epsilon)
             {
                 fs.ReadExactly(FloatBuffer, 0, 4);
@@ -256,7 +261,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 var shit = NewKeyFramesList[CurrentKeyFrame];
                 float shitfloat = Convert.ToSingle(shit);
                 byte[] shitbyte = BitConverter.GetBytes(shitfloat);
-                //Console.WriteLine(piss);
+                Console.WriteLine(piss);
                 
 
                 if (ConvertedBuffer == pissfloat)
@@ -275,19 +280,28 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 {
                     Console.WriteLine($"Parsed value too big!!!");
                     ++CurrentKeyFrame;
+                    break;
+                    //I'm so fucking stupid
+                    //ConvertedBuffer = 1;
                 }
+                Console.WriteLine($"loop");
             }
             
         }
         catch (Exception e)
         {
             Console.WriteLine(e.ToString());
-            //Console.WriteLine($"shit");
+            Console.WriteLine($"shit");
         }
 
         
 
     }
+
+    Console.WriteLine($"Please enter the new length of the animation");
+    Console.WriteLine($"(I recommend just making it the highest value you entered");
+    fs.Position = FinalOffset;
+
     
     fs.Close();
 
