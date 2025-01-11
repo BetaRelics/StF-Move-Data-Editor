@@ -8,7 +8,7 @@ string EpFilePath;
 Console.WriteLine($"Just a heads up, this application will make a back-up of your current rom folder");
 Console.WriteLine($"It'll be stored in a folder in the same directory as this application");
 Console.WriteLine($"I'd keep in mind whether your stf_rom folder is modded or not");
-Console.WriteLine("Enter stf_rom folder Path");
+Console.WriteLine($"Enter stf_rom folder Path");
 Console.WriteLine(Directory.GetCurrentDirectory());
 RomPath = Console.ReadLine();
 
@@ -37,10 +37,10 @@ if (!dir.Exists)
 
 DirectoryInfo[] dirs = dir.GetDirectories();
 Directory.CreateDirectory(FolderForBackup);
-foreach (FileInfo file in dir.GetFiles())
+foreach (FileInfo filein in dir.GetFiles())
 {
-    string TargetFilePath = Path.Combine(FolderForBackup, file.Name);
-    file.CopyTo( TargetFilePath );
+    string TargetFilePath = Path.Combine(FolderForBackup, filein.Name);
+    filein.CopyTo( TargetFilePath, true);
 }
 
 DataFilePath = Path.Combine(RomPath, $"rom_data.bin");
@@ -55,7 +55,7 @@ if (!File.Exists(DataFilePath))
 }
 
 
-using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
 {
     //set the filestream position to the beginning of the move data table. Well, the beginning +4...
     //for now we're skipping the first 4 bytes that tell us how big the table is, but I'll probably change this later
@@ -171,14 +171,15 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
         if (ConvertedBuffer == 1)
         {
             //just keeping track of how many "sets" of keyframes there are
+            //possibly changes this to counting the bytes that defines amount of keyframes
             ++counter;
         }
 
         //following the keyframe list, there's typically some bytes that are equal to very large/small integers
         //by checking the float's absolute value against 500, we ensure we aren't accidentally reading those
-        //logically, no move should ever be 500 frames long, so this solution shouldn't be an issue
+        //logically, no move should ever be 400 frames long, so this solution shouldn't be an issue
         //there's definitely a better way to do this though
-        if (Math.Abs(ConvertedBuffer) > 500)
+        if (Math.Abs(ConvertedBuffer) > 400)
         {
             break;
         }
@@ -226,6 +227,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
         catch
         {
             Console.WriteLine($"something went wrong, failed to read/replace keyframe");
+            --CurrentKeyFrame;
         }
     }
     //int OldListLength = UniqueKeyFrames.Count;
@@ -235,10 +237,59 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.Read, F
         Console.WriteLine($"Error! List lengths do not match!");
         return;
     }
+
+    ConvertedBuffer = 0;
+    CurrentKeyFrame = 0;
     
-    fs.Seek(FloatStartPos, SeekOrigin.Begin);
+    foreach (int NewKeyFrameForReplace in NewKeyFramesList)
+    {
+        try
+        {
+            while ((ConvertedBuffer % 1) < float.Epsilon)
+            {
+                fs.ReadExactly(FloatBuffer, 0, 4);
+                ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
 
+                var piss = UniqueKeyFrames[CurrentKeyFrame];
+                float pissfloat = Convert.ToSingle(piss);
+                byte[] pissbyte = BitConverter.GetBytes(pissfloat);
+                var shit = NewKeyFramesList[CurrentKeyFrame];
+                float shitfloat = Convert.ToSingle(shit);
+                byte[] shitbyte = BitConverter.GetBytes(shitfloat);
+                //Console.WriteLine(piss);
+                
 
+                if (ConvertedBuffer == pissfloat)
+                {
+                    //string test = BitConverter.ToString(pissbyte);
+                    //Console.WriteLine(test);
+                    fs.Position = (fs.Position - 4);
+                    fs.Write(shitbyte, 0, 4);
+                    
+                    string shitstring = Convert.ToHexString(shitbyte);
+                    Console.WriteLine(shitstring);
+                    //UniqueKeyFrames.ForEach(i => {Console.WriteLine(i.ToString());});
+
+                }
+                if (ConvertedBuffer > 400)
+                {
+                    Console.WriteLine($"Parsed value too big!!!");
+                    ++CurrentKeyFrame;
+                }
+            }
+            
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.ToString());
+            //Console.WriteLine($"shit");
+        }
+
+        
+
+    }
+    
+    fs.Close();
 
 }
     
