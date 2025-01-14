@@ -364,8 +364,15 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         byte[] intbuffer = new byte[2];
         //this works
         //Code1fs.ReadExactly(intbuffer, 0, 2);
+        fs.ReadExactly(intbuffer, 0, 2);
+        fs.Position = fs.Position - 2;
         Console.WriteLine($"Enter what frame you want the move to become active on");
+        Console.WriteLine($"Original value was {Convert.ToInt16(intbuffer)}");
         string StringActFrame = Console.ReadLine();
+        if (StringActFrame == null)
+        {
+            return;
+        }
         int IntActFrame = Convert.ToInt16(Console.ReadLine());
         byte[] ByteActFrame = BitConverter.GetBytes(IntActFrame);
         fs.Write(ByteActFrame, 0, 2);
@@ -373,17 +380,29 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
 
 
-
+        fs.ReadExactly(intbuffer, 0, 2);
+        fs.Position = fs.Position - 2;
         Console.WriteLine($"Enter what frame you want the move to stop being active on");
+        Console.WriteLine($"Original value was {Convert.ToInt16(intbuffer)}");
         StringActFrame = Console.ReadLine();
+        if (StringActFrame == null)
+        {
+            return;
+        }
         IntActFrame = Convert.ToInt16(Console.ReadLine());   
         ByteActFrame = BitConverter.GetBytes(IntActFrame);
         fs.Write(ByteActFrame, 0, 2);
 
-        
-        
+
+        fs.ReadExactly(intbuffer, 0, 2);
+        fs.Position = fs.Position - 2;
         Console.WriteLine($"Enter the frame the move ends on");
+        Console.WriteLine($"Original value was {Convert.ToInt16(intbuffer)}");
         StringActFrame = Console.ReadLine();
+        if (StringActFrame == null)
+        {
+            return;
+        }
         IntActFrame = Convert.ToInt16(Console.ReadLine());
         ByteActFrame = BitConverter.GetBytes(IntActFrame);
         fs.Write(ByteActFrame, 0, 2);
