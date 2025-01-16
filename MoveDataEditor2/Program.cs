@@ -1,4 +1,4 @@
-﻿
+﻿using System.Text;
 //we need to use both the data and ep files, huh
 //maybe we can make it depend on how large the value entered is?
 Start:
@@ -67,10 +67,32 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //somewhere here we'll have the user enter a move ID and we'll advance in the list by the ID multiplied by 4
     //We should probably account for both hex and decimal IDs
     //0 index might be an issue too? not sure
-
+    string HexQuery;
+    bool HexMode = false;
     string MoveIDEntered;
     int MoveIDForSeeking;
     int CalculatedOffset;
+    Console.WriteLine($"Before we start, do you wish to enter the move ID in hex? type 'y' for yes, or 'n' for no, and hit enter");
+    HexQuery = Console.ReadLine();
+    if (HexQuery == null)
+    {
+        goto Start;
+    }
+    else if (HexQuery == "y")
+    {
+        Console.WriteLine($"Hex mode enabled");
+        HexMode = true;
+    }
+    else if (HexQuery == "n")
+    {
+        Console.WriteLine($"Proceeding with No Hex Mode");
+        HexMode = false;
+    }
+    else
+    {
+        Console.WriteLine("Invalid Response, Restarting the program");
+        goto Start;
+    }
     Console.WriteLine("Enter the ID of the move who's data you wish to access");
     MoveIDEntered = Console.ReadLine();
 
@@ -79,15 +101,37 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Console.WriteLine("null value entered. Why would you do that?");
         return;
     }
-
+   
 
     try
     {
-        MoveIDForSeeking = Convert.ToInt32(MoveIDEntered);
+        if (HexMode == true)
+        {
+            MoveIDForSeeking = int.Parse(MoveIDEntered, System.Globalization.NumberStyles.HexNumber);
+        }
+        else
+        {
+            MoveIDForSeeking = Convert.ToInt32(MoveIDEntered);
+        }
+
+        if (MoveIDForSeeking == 0)
+        {
+            Console.WriteLine($"ID 0 is assigned to Null, and thus is not a valid move");
+            return;
+        }
+        if (MoveIDForSeeking > 517)
+        {
+            Console.WriteLine($"ID entered is outside the range of valid moves (517 is the cutoff)");
+        }
+        if (MoveIDForSeeking > 458) 
+        {
+            goto EpFileProcessing;
+        }
         CalculatedOffset = MoveIDForSeeking * 4;
         if (CalculatedOffset < 0)
         {
             Console.WriteLine($"Negative ID entered, try entering a move ID that exists/is positive");
+            return;
         }
 
         fs.Seek(CalculatedOffset + 0x120004, SeekOrigin.Begin);
@@ -119,9 +163,46 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     string HexBuffer = Convert.ToHexString(AddressBuffer);
 
     int FinalOffset = int.Parse(HexBuffer, System.Globalization.NumberStyles.HexNumber);
-    Console.WriteLine(FinalOffset);
+    //Console.WriteLine(FinalOffset);
 
-    //Jump to the offset, and get the animation length in frames
+    //Jump to the offset, and store the position.
+    fs.Seek(FinalOffset, SeekOrigin.Begin);
+    var DataPos = fs.Position;
+
+    //Go to the internal name table and find the address of the move's name
+    byte[] NameAddress = new byte[3];
+    fs.Seek(CalculatedOffset + 0x120738, SeekOrigin.Begin);
+    fs.ReadExactly(NameAddress, 0, 3);
+    Array.Reverse(NameAddress);
+    string NameHexBuffer = Convert.ToHexString(NameAddress);
+    
+    int FinalNameOffset = int.Parse(NameHexBuffer, System.Globalization.NumberStyles.HexNumber);
+    //Jump to said address
+    fs.Seek(FinalNameOffset, SeekOrigin.Begin);
+    
+    //Read bytes till we hit the terminator to get the length of the name
+    bool NameTerminatorCheck = false;
+    int NameLength = 0;
+    while (NameTerminatorCheck == false)
+    {
+        int NameByte = fs.ReadByte();
+        if (NameByte == 0)
+        {
+            //Console.WriteLine(NameByte);
+            //Console.WriteLine(fs.Position);
+            NameTerminatorCheck = true;
+            break;
+        }
+       
+        ++NameLength;
+    }
+    fs.Seek(FinalNameOffset, SeekOrigin.Begin);
+    byte[] NameAllBytes = new byte[NameLength];
+    fs.ReadExactly(NameAllBytes, 0, NameLength);
+    string Name = Encoding.UTF8.GetString(NameAllBytes);
+    Console.WriteLine($"This animation is named {Name}");
+    //Console.WriteLine(FinalNameOffset);
+
     fs.Seek(FinalOffset, SeekOrigin.Begin);
     byte[] DataBuffer = new byte[2];
     fs.ReadExactly(DataBuffer, 0, 2);
@@ -188,7 +269,10 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         {
             break;
         }
-
+        if (Math.Abs(ConvertedBuffer) == 0)
+        {
+            break;
+        }
         int BufferToInt = (int)ConvertedBuffer;
 
         //here we're making a list of the unique keyframes
@@ -205,7 +289,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //string DefaultF = BitConverter.ToString(DefaultFloat);
     //Console.WriteLine(DefaultF);
 
-
+    KeyFrameStuff:
     UniqueKeyFrames.ForEach(i => Console.WriteLine(i + ","));
     List<int> NewKeyFramesList = new List<int>();
     //string NewList;
@@ -237,7 +321,9 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
             Console.WriteLine($"Something went wrong, failed to read the entered keyframe");
             Console.WriteLine($"Try again");
             NewKeyFramesList.Remove(CurrentKeyFrame);
-            --CurrentKeyFrame;
+            Console.WriteLine(NewKeyFramesList.Count);
+            Console.WriteLine("Start from the top");
+            goto KeyFrameStuff;
         }
     }
     //int OldListLength = UniqueKeyFrames.Count;
@@ -336,6 +422,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //Now we'll write some values to the code1 file so things work smoothly
     //Disposing the original filestream, as it should no longer be needed?
     fs.Dispose();
+
+    Code1Handling:
     using (FileStream Code1fs = File.Open(Code1Path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
     {
         Code1fs.Seek(CalculatedOffset + 0xCE380, 0);
@@ -368,10 +456,15 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Code1fs.Position = Code1fs.Position - 2;
         Console.WriteLine($"Enter what frame you want the move to become active on");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
+        Console.WriteLine($"If the animation you're modifying doesn't have active frames, type 'skip'");
         string StringActFrame = Console.ReadLine();
         if (StringActFrame == null)
         {
             return;
+        }
+        if (StringActFrame == "skip")
+        {
+            goto skipped;
         }
         int IntActFrame = Convert.ToInt16(StringActFrame);
         byte[] ByteActFrame = BitConverter.GetBytes(IntActFrame);
@@ -410,8 +503,318 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
     }
 
-
+skipped:
     fs.Close();
+    Console.WriteLine($"You're all set!");
+    return;
 
+
+    EpFileProcessing: 
+    fs.Close();
+    using (FileStream Epfs = File.Open(EpFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)) 
+    { 
+        Epfs.Seek(0x04, SeekOrigin.Begin);
+        try 
+        {
+            CalculatedOffset = MoveIDForSeeking * 4;
+            if (CalculatedOffset < 0)
+            {
+                Console.WriteLine($"Negative ID entered, try entering a move ID that exists/is positive");
+            }
+            if (CalculatedOffset == 0)
+            {
+                Console.WriteLine($"ID 0 is assigned to Null, and thus is not a valid move");
+                return;
+            }
+
+            
+            Epfs.Seek(CalculatedOffset + 0x04, SeekOrigin.Begin);
+           
+            
+            //Read the first 3 bytes of the address, as we don't ever need the fourth
+            AddressBuffer = new byte[3];
+            Epfs.ReadExactly(AddressBuffer, 0, 3);
+            
+            Array.Reverse(AddressBuffer);
+
+            HexBuffer = Convert.ToHexString(AddressBuffer);
+
+            FinalOffset = int.Parse(HexBuffer, System.Globalization.NumberStyles.HexNumber);
+            //Ep file addresses are offset by 0x400000
+            FinalOffset = FinalOffset - 0x400000;
+            //Console.WriteLine(FinalOffset);
+
+            //Go to the internal name table and find the address of the move's name
+            NameAddress = new byte[3];
+            Epfs.Seek(CalculatedOffset + 0x820, SeekOrigin.Begin);
+            Epfs.ReadExactly(NameAddress, 0, 3);
+            Array.Reverse(NameAddress);
+            NameHexBuffer = Convert.ToHexString(NameAddress);
+
+            FinalNameOffset = int.Parse(NameHexBuffer, System.Globalization.NumberStyles.HexNumber);
+            //Ep file addresses are offset by 0x400000
+            FinalNameOffset = FinalNameOffset - 0x400000;
+            //Console.WriteLine(FinalNameOffset);
+            
+            //Jump to said address
+            Epfs.Seek(FinalNameOffset, SeekOrigin.Begin);
+
+            //Read bytes till we hit the terminator to get the length of the name
+            NameTerminatorCheck = false;
+            NameLength = 0;
+            while (NameTerminatorCheck == false)
+            {
+                int NameByte = Epfs.ReadByte();
+                if (NameByte == 0)
+                {
+                    //Console.WriteLine(NameByte);
+                    //Console.WriteLine(Epfs.Position);
+                    NameTerminatorCheck = true;
+                    break;
+                }
+
+                ++NameLength;
+            }
+            Epfs.Seek(FinalNameOffset, SeekOrigin.Begin);
+            NameAllBytes = new byte[NameLength];
+            Epfs.ReadExactly(NameAllBytes, 0, NameLength);
+            Name = Encoding.UTF8.GetString(NameAllBytes);
+            Console.WriteLine($"This animation is named {Name}");
+
+
+            //Jump to the animation offset, and get the animation length in frames
+            Epfs.Seek(FinalOffset, SeekOrigin.Begin);
+            DataBuffer = new byte[3];
+            Epfs.ReadExactly(DataBuffer, 0, 3);
+
+            MoveLength = BitConverter.ToInt16(DataBuffer, 0);
+            Console.WriteLine($"This animation is {MoveLength} frames long!");
+
+            Epfs.Seek(FinalOffset + 4, SeekOrigin.Begin);
+
+            //byte[] FloatByteBuffer = new byte[4];
+
+            FloatBuffer = new byte[4];
+
+            //byte[] DefaultFloat = [0x00, 0x00, 0x80, 0x3F];
+
+            ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
+
+            counter = 0;
+
+            try
+            {
+
+                while (ConvertedBuffer != 1)
+                {
+
+                    //somewhere here we might include some code that checks for how many keyframes are in each set
+                    //since there are bytes right before the keyframe floats that specify that
+                    Epfs.ReadExactly(FloatBuffer, 0, 4);
+                    ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
+                    string FloatBufferString = Convert.ToHexString(FloatBuffer);
+                    Console.WriteLine(FloatBufferString);
+                    float FBuffer = BitConverter.ToSingle(FloatBuffer, 0);
+                    Console.WriteLine(FBuffer);
+
+
+                    //counter++;
+                }
+
+                //Move the Filestream position back 4 bytes so we include the first keyframe in the list
+                Epfs.Position = (Epfs.Position - 4);
+                FloatStartPos = Epfs.Position;
+                UniqueKeyFrames = new List<int>();
+
+                //the while condition here runs unless the float buffer returns a non-integer value
+                //the check against float.Epsilon accounts for miniscule rounding errors
+                while ((ConvertedBuffer % 1) < float.Epsilon)
+                {
+                    Epfs.ReadExactly(FloatBuffer, 0, 4);
+                    ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
+                    if (ConvertedBuffer == 1)
+                    {
+                        //just keeping track of how many "sets" of keyframes there are
+                        //possibly changes this to counting the bytes that defines amount of keyframes
+                        ++counter;
+                    }
+
+                    //following the keyframe list, there's typically some bytes that are equal to very large/small integers
+                    //by checking the float's absolute value against 400, we ensure we aren't accidentally reading those
+                    //logically, no move should ever be 400 frames long, so this solution shouldn't be an issue
+                    //there's definitely a better way to do this though
+                    //This can be updated due to the new findings in the "header" part
+                    if (Math.Abs(ConvertedBuffer) > 400)
+                    {
+                        break;
+                    }
+                    if (Math.Abs(ConvertedBuffer) == 0)
+                    {
+                        break;
+                    }
+                    int BufferToInt = (int)ConvertedBuffer;
+
+                    //here we're making a list of the unique keyframes
+                    //in the future the user will be able to view them and will have the option to replace them
+                    //this isn't super customizable but it's good for simple framedata changes
+                    if (!UniqueKeyFrames.Contains(BufferToInt))
+                    {
+                        UniqueKeyFrames.Add(BufferToInt);
+                    }
+
+
+                }
+
+                //string DefaultF = BitConverter.ToString(DefaultFloat);
+                //Console.WriteLine(DefaultF);
+
+                //UniqueKeyFrames.Sort();
+                UniqueKeyFrames.ForEach(i => Console.WriteLine(i + ","));
+                NewKeyFramesList = new List<int>();
+                //string NewList;
+                CurrentKeyFrame = 1;
+                Console.WriteLine($"Please enter what you'd like to swap these frame timings to");
+                Console.WriteLine($"Enter one number at a time, in the order they appeared in before");
+                Console.WriteLine($"Keep in mind entering the same number for multiple frames will result in-");
+                Console.WriteLine($"-there being fewer unique keyframes, which may not be ideal");
+
+                //This is the part that allows the user to make a list of their own keyframes
+                foreach (int KeyFrame in UniqueKeyFrames)
+                {
+                    try
+                    {
+                        Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
+                        string NewKeyFrame = Console.ReadLine();
+                        if (NewKeyFrame == null)
+                        {
+                            return;
+                        }
+                        int KeyFrameForReplace = Convert.ToInt16(NewKeyFrame);
+                        NewKeyFramesList.Add(KeyFrameForReplace);
+                        ++CurrentKeyFrame;
+                    }
+
+                    catch
+                    {
+                        Console.WriteLine($"Something went wrong, failed to read the entered keyframe");
+                        Console.WriteLine($"Try again");
+                        NewKeyFramesList.Remove(CurrentKeyFrame);
+                        --CurrentKeyFrame;
+                    }
+                }
+                //int OldListLength = UniqueKeyFrames.Count;
+                //int NewListLength = NewKeyFrames.Count;
+                if (UniqueKeyFrames.Count - NewKeyFramesList.Count != 0)
+                {
+                    Console.WriteLine($"Error! List lengths do not match!");
+                    return;
+                }
+
+                ConvertedBuffer = 0;
+                CurrentKeyFrame = 0;
+    
+
+    
+                foreach (int NewKeyFrameForReplace in NewKeyFramesList)
+                {
+                    try
+                    {
+                        //Resets the position for each int we search for
+                        //Resets the buffer so it doesn't get stuck
+                        Epfs.Position = FloatStartPos;
+                        ConvertedBuffer = 1;
+                        while ((ConvertedBuffer % 1) < float.Epsilon)
+                        {
+                            //Reads a float and stores it
+                            Epfs.ReadExactly(FloatBuffer, 0, 4);
+                            ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
+
+                            //Gets the float equivalent of a certain int in each list
+                            //Need to rename these
+                            var piss = UniqueKeyFrames[CurrentKeyFrame];
+                            float pissfloat = Convert.ToSingle(piss);
+                            byte[] pissbyte = BitConverter.GetBytes(pissfloat);
+                            var shit = NewKeyFramesList[CurrentKeyFrame];
+                            float shitfloat = Convert.ToSingle(shit);
+                            byte[] shitbyte = BitConverter.GetBytes(shitfloat);
+                            Console.WriteLine(piss);
+                
+                            //Hits if the float matches one of the original keyframes
+                            if (ConvertedBuffer == pissfloat)
+                            {
+                                //string test = BitConverter.ToString(pissbyte);
+                                //Console.WriteLine(test);
+
+                                //Overwrites the float with the user entered float from the new list
+                                Epfs.Position = (Epfs.Position - 4);
+                                Epfs.Write(shitbyte, 0, 4);
+                    
+                                //debug
+                                string shitstring = Convert.ToHexString(shitbyte);
+                                Console.WriteLine(shitstring);
+
+                                //UniqueKeyFrames.ForEach(i => {Console.WriteLine(i.ToString());});
+
+                            }
+                            //Should only hit when the stream goes past the floats
+                            //This can be updated with more accurate code due to the new findings in the "header" part
+                            if (ConvertedBuffer > 400)
+                            {
+                                Console.WriteLine($"Parsed value too big!!!");
+                                ++CurrentKeyFrame;
+                                break;
+                                //I'm so fucking stupid
+                                //ConvertedBuffer = 1;
+                            }
+                            //debug
+                            Console.WriteLine($"loop");
+                        }
+            
+                    }
+                    catch (Exception e)
+                    {
+                        //debug
+                        Console.WriteLine(e.ToString());
+                        Console.WriteLine($"shit");
+                    }
+
+        
+
+                }
+
+                Console.WriteLine($"Please enter what frame the animation ends on");
+                Console.WriteLine($"(I recommend just making it the highest value you entered");
+                EndingFrame = Convert.ToInt16( Console.ReadLine() );
+                Epfs.Position = FinalOffset;
+                EndingFrameBytes = new byte[2];
+                EndingFrameBytes = BitConverter.GetBytes(EndingFrame);
+   
+                //Commented-out debug code.
+                //string EndF = Convert.ToHexString(EndingFrameBytes);
+                //Console.WriteLine(EndF);
+    
+                Epfs.Write(EndingFrameBytes, 0, 2);
+                
+                
+                Epfs.Dispose();
+                goto Code1Handling;
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+
+
+        }
+        catch (Exception e) 
+        { 
+            Console.WriteLine(e.ToString());
+        
+        }
+
+       
+    }
+    
 }
     
