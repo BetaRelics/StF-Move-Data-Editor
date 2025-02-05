@@ -742,9 +742,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
                 ConvertedBuffer = 0;
                 CurrentKeyFrame = 0;
-    
 
-    
+                //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
+                //temp fix? I haven't even tested this tbh
+                UniqueKeyFrames.Reverse();
+                NewKeyFramesList.Reverse();
+
                 foreach (int NewKeyFrameForReplace in NewKeyFramesList)
                 {
                     try
