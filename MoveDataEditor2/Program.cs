@@ -1,6 +1,4 @@
 ﻿using System.Text;
-//we need to use both the data and ep files, huh
-//maybe we can make it depend on how large the value entered is?
 Start:
 string RomPath;
 string DataFilePath;
@@ -15,8 +13,8 @@ RomPath = Console.ReadLine();
 
 if (RomPath == null)
 {
-    Console.WriteLine("null value entered. Why would you do that?");
-    return;
+    Console.WriteLine("null value entered.");
+    goto Start;
 }
 
 //trims quotes from path if there are any
@@ -36,6 +34,33 @@ if (!dir.Exists)
     goto Start;
 }
 
+if (Directory.Exists(FolderForBackup))
+{
+    Console.WriteLine($"A backup folder was found, do you wish to overwrite it? type 'y' for yes, or 'n' for no");
+    string PathResponse = Console.ReadLine();
+    if (PathResponse == null)
+    {
+        Console.WriteLine($"Null value entered, returning to start");
+        goto Start;
+    }
+    if (PathResponse == "n")
+    {
+        goto PathCombining;
+    }
+    else if (PathResponse == "y")
+    {
+        goto CreateBackup;
+    }
+    else
+    {
+        Console.WriteLine($"Reponse not recognized, did you enter lowercase 'y' or 'n'?");
+        Console.WriteLine($"Press any key and hit enter to return to the start of the program");
+        Console.ReadLine();
+        goto Start;
+    }
+}
+
+CreateBackup:
 DirectoryInfo[] dirs = dir.GetDirectories();
 Directory.CreateDirectory(FolderForBackup);
 foreach (FileInfo filein in dir.GetFiles())
@@ -44,6 +69,7 @@ foreach (FileInfo filein in dir.GetFiles())
     filein.CopyTo( TargetFilePath, true);
 }
 
+PathCombining:
 DataFilePath = Path.Combine(RomPath, $"rom_data.bin");
 EpFilePath = Path.Combine(RomPath, $"rom_ep.bin");
 Code1Path = Path.Combine(RomPath, $"rom_code1.bin");
@@ -60,13 +86,9 @@ if (!File.Exists(DataFilePath))
 using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
 {
     //set the filestream position to the beginning of the move data table. Well, the beginning +4...
-    //for now we're skipping the first 4 bytes that tell us how big the table is, but I'll probably change this later
-    //need to fix the 0 indexing
+    //for now we're skipping the first 4 bytes that tell us how big the table is
     fs.Seek(0x120004, SeekOrigin.Begin);
 
-    //somewhere here we'll have the user enter a move ID and we'll advance in the list by the ID multiplied by 4
-    //We should probably account for both hex and decimal IDs
-    //0 index might be an issue too? not sure
     string HexQuery;
     bool HexMode = false;
     string MoveIDEntered;
@@ -85,7 +107,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     }
     else if (HexQuery == "n")
     {
-        Console.WriteLine($"Proceeding with No Hex Mode");
+        Console.WriteLine($"Proceeding with Decimal Mode");
         HexMode = false;
     }
     else
@@ -93,6 +115,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Console.WriteLine("Invalid Response, Restarting the program");
         goto Start;
     }
+    RequestID:
     Console.WriteLine("Enter the ID of the move who's data you wish to access");
     MoveIDEntered = Console.ReadLine();
 
@@ -116,12 +139,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
         if (MoveIDForSeeking == 0)
         {
-            Console.WriteLine($"ID 0 is assigned to Null, and thus is not a valid move");
-            return;
+            Console.WriteLine($"ID 0 is assigned to NULL, and thus is not a valid move");
+            goto RequestID;
         }
         if (MoveIDForSeeking > 517)
         {
-            Console.WriteLine($"ID entered is outside the range of valid moves (517 is the cutoff)");
+            Console.WriteLine($"The ID entered is outside the range of valid moves (517 is the cutoff)");
         }
         if (MoveIDForSeeking > 458) 
         {
@@ -131,7 +154,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         if (CalculatedOffset < 0)
         {
             Console.WriteLine($"Negative ID entered, try entering a move ID that exists/is positive");
-            return;
+            goto RequestID;
         }
 
         fs.Seek(CalculatedOffset + 0x120004, SeekOrigin.Begin);
@@ -256,7 +279,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         if (ConvertedBuffer == 1)
         {
             //just keeping track of how many "sets" of keyframes there are
-            //possibly changes this to counting the bytes that defines amount of keyframes
+            //possibly change this to counting the bytes that defines amount of keyframes
             ++counter;
         }
 
@@ -276,7 +299,6 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         int BufferToInt = (int)ConvertedBuffer;
 
         //here we're making a list of the unique keyframes
-        //in the future the user will be able to view them and will have the option to replace them
         //this isn't super customizable but it's good for simple framedata changes
         if (!UniqueKeyFrames.Contains(BufferToInt))
         {
@@ -306,6 +328,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         try
         {
             Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
+            Console.WriteLine($"This keyframe's old value was {UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1)}");
             string NewKeyFrame = Console.ReadLine();
             if (NewKeyFrame == null)
             {
@@ -336,8 +359,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
     ConvertedBuffer = 0;
     CurrentKeyFrame = 0;
-    
 
+
+    //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
+    //temp fix? I haven't even tested this tbh
+    UniqueKeyFrames.Reverse();
+    NewKeyFramesList.Reverse();
     
     foreach (int NewKeyFrameForReplace in NewKeyFramesList)
     {
@@ -369,6 +396,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     //string test = BitConverter.ToString(pissbyte);
                     //Console.WriteLine(test);
 
+
+                    
                     //Overwrites the float with the user entered float from the new list
                     fs.Position = (fs.Position - 4);
                     fs.Write(shitbyte, 0, 4);
@@ -407,7 +436,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     }
 
     Console.WriteLine($"Please enter what frame the animation ends on");
-    Console.WriteLine($"(I recommend just making it the highest value you entered");
+    Console.WriteLine($"The animation previously ended on frame {MoveLength}");
+    Console.WriteLine($"(I recommend just making it the highest value you entered, which was {NewKeyFramesList.Max()})");
     int EndingFrame = Convert.ToInt16( Console.ReadLine() );
     fs.Position = FinalOffset;
     byte[] EndingFrameBytes = new byte[2];
@@ -455,8 +485,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Code1fs.ReadExactly(intbuffer, 0, 2);
         Code1fs.Position = Code1fs.Position - 2;
         Console.WriteLine($"Enter what frame you want the move to become active on");
-        Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
-        Console.WriteLine($"If the animation you're modifying doesn't have active frames, type 'skip'");
+        Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}(?)");
+        Console.WriteLine($"If the move you're modifying doesn't have active frames, type 'skip'");
         string StringActFrame = Console.ReadLine();
         if (StringActFrame == null)
         {
@@ -503,7 +533,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
     }
 
-skipped:
+    skipped:
     fs.Close();
     Console.WriteLine($"You're all set!");
     return;
@@ -667,7 +697,7 @@ skipped:
 
                 //string DefaultF = BitConverter.ToString(DefaultFloat);
                 //Console.WriteLine(DefaultF);
-
+                EpKeyFrameStuff:
                 //UniqueKeyFrames.Sort();
                 UniqueKeyFrames.ForEach(i => Console.WriteLine(i + ","));
                 NewKeyFramesList = new List<int>();
@@ -699,7 +729,7 @@ skipped:
                         Console.WriteLine($"Something went wrong, failed to read the entered keyframe");
                         Console.WriteLine($"Try again");
                         NewKeyFramesList.Remove(CurrentKeyFrame);
-                        --CurrentKeyFrame;
+                        goto EpKeyFrameStuff;
                     }
                 }
                 //int OldListLength = UniqueKeyFrames.Count;
@@ -783,7 +813,8 @@ skipped:
                 }
 
                 Console.WriteLine($"Please enter what frame the animation ends on");
-                Console.WriteLine($"(I recommend just making it the highest value you entered");
+                Console.WriteLine($"The animation previously ended on frame {MoveLength}");
+                Console.WriteLine($"(I recommend just making it the highest value you entered, which was {NewKeyFramesList.Max()})");
                 EndingFrame = Convert.ToInt16( Console.ReadLine() );
                 Epfs.Position = FinalOffset;
                 EndingFrameBytes = new byte[2];
