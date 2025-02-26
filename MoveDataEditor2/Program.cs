@@ -830,7 +830,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                                 //Console.WriteLine($"Parsed value too big!!!");
                                 ++CurrentKeyFrame;
                                 break;
-                                //I'm so fucking stupid
+                                //I'm so stupid
                                 //ConvertedBuffer = 1;
                             }
                             //debug
