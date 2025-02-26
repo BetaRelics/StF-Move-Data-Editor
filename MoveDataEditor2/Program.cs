@@ -8,18 +8,19 @@ Console.WriteLine($"Just a heads up, this application will make a back-up of you
 Console.WriteLine($"It'll be stored in a folder in the same directory as this application");
 Console.WriteLine($"I'd keep in mind whether your stf_rom folder is modded or not");
 Console.WriteLine($"Enter stf_rom folder Path");
-Console.WriteLine(Directory.GetCurrentDirectory());
+//Console.WriteLine(Directory.GetCurrentDirectory());
 RomPath = Console.ReadLine();
 
-if (RomPath == null)
+if (string.IsNullOrEmpty(RomPath))
 {
     Console.WriteLine("null value entered.");
+    Console.WriteLine($"Starting the program from the beginning...");
     goto Start;
 }
 
 //trims quotes from path if there are any
 RomPath = RomPath.Trim('"');
-Console.WriteLine(RomPath);
+//Console.WriteLine(RomPath);
 
 //Console.WriteLine($"Do you wish to make a copy of the original folder before you make any changes?");
 //if (Console.ReadLine() == "y")
@@ -38,7 +39,7 @@ if (Directory.Exists(FolderForBackup))
 {
     Console.WriteLine($"A backup folder was found, do you wish to overwrite it? type 'y' for yes, or 'n' for no");
     string PathResponse = Console.ReadLine();
-    if (PathResponse == null)
+    if (String.IsNullOrEmpty(PathResponse))
     {
         Console.WriteLine($"Null value entered, returning to start");
         goto Start;
@@ -116,7 +117,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         goto Start;
     }
     RequestID:
-    Console.WriteLine("Enter the ID of the move who's data you wish to access");
+    Console.WriteLine("Enter the ID of the move whose data you wish to access");
     MoveIDEntered = Console.ReadLine();
 
     if (MoveIDEntered == null)
@@ -145,6 +146,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         if (MoveIDForSeeking > 517)
         {
             Console.WriteLine($"The ID entered is outside the range of valid moves (517 is the cutoff)");
+            goto RequestID;
         }
         if (MoveIDForSeeking > 458) 
         {
@@ -219,6 +221,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
        
         ++NameLength;
     }
+    //Now that we know the length, read the entire name to the console
     fs.Seek(FinalNameOffset, SeekOrigin.Begin);
     byte[] NameAllBytes = new byte[NameLength];
     fs.ReadExactly(NameAllBytes, 0, NameLength);
@@ -257,9 +260,9 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         fs.ReadExactly(FloatBuffer, 0, 4);
         ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
         string FloatBufferString = Convert.ToHexString(FloatBuffer);
-        Console.WriteLine(FloatBufferString);
+        //Console.WriteLine(FloatBufferString);
         float FBuffer = BitConverter.ToSingle(FloatBuffer, 0);
-        Console.WriteLine(FBuffer);
+        //Console.WriteLine(FBuffer);
 
 
         //counter++;
@@ -312,6 +315,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //Console.WriteLine(DefaultF);
 
     KeyFrameStuff:
+    Console.WriteLine($"This animation has {UniqueKeyFrames.Count} unique Key Frames");
+    Console.WriteLine($"These are the unique Key Frame values:");
     UniqueKeyFrames.ForEach(i => Console.WriteLine(i + ","));
     List<int> NewKeyFramesList = new List<int>();
     //string NewList;
@@ -363,9 +368,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
     //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
     //temp fix? I haven't even tested this tbh
-    UniqueKeyFrames.Reverse();
-    NewKeyFramesList.Reverse();
-    
+    if (NewKeyFramesList.Max() > UniqueKeyFrames.Max())
+    {
+        UniqueKeyFrames.Reverse();
+        NewKeyFramesList.Reverse();
+    }
+
     foreach (int NewKeyFrameForReplace in NewKeyFramesList)
     {
         try
@@ -388,7 +396,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 var shit = NewKeyFramesList[CurrentKeyFrame];
                 float shitfloat = Convert.ToSingle(shit);
                 byte[] shitbyte = BitConverter.GetBytes(shitfloat);
-                Console.WriteLine(piss);
+                //Console.WriteLine(piss);
                 
                 //Hits if the float matches one of the original keyframes
                 if (ConvertedBuffer == pissfloat)
@@ -403,8 +411,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     fs.Write(shitbyte, 0, 4);
                     
                     //debug
-                    string shitstring = Convert.ToHexString(shitbyte);
-                    Console.WriteLine(shitstring);
+                    //string shitstring = Convert.ToHexString(shitbyte);
+                    //Console.WriteLine(shitstring);
 
                     //UniqueKeyFrames.ForEach(i => {Console.WriteLine(i.ToString());});
 
@@ -413,14 +421,14 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 //This can be updated with more accurate code due to the new findings in the "header" part
                 if (ConvertedBuffer > 400)
                 {
-                    Console.WriteLine($"Parsed value too big!!!");
+                    //Console.WriteLine($"Parsed value too big!!!");
                     ++CurrentKeyFrame;
                     break;
-                    //I'm so fucking stupid
+                    //I'm so stupid
                     //ConvertedBuffer = 1;
                 }
                 //debug
-                Console.WriteLine($"loop");
+                //Console.WriteLine($"loop");
             }
             
         }
@@ -486,7 +494,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Code1fs.Position = Code1fs.Position - 2;
         Console.WriteLine($"Enter what frame you want the move to become active on");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}(?)");
-        Console.WriteLine($"If the move you're modifying doesn't have active frames, type 'skip'");
+        Console.WriteLine($"If the move you're modifying doesn't have active frames, type 'skip' and hit enter");
         string StringActFrame = Console.ReadLine();
         if (StringActFrame == null)
         {
@@ -522,7 +530,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Console.WriteLine($"Enter the frame the move ends on");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
         StringActFrame = Console.ReadLine();
-        if (StringActFrame == null)
+        if (String.IsNullOrEmpty(StringActFrame))
         {
             Console.WriteLine($"Null value entered, don't do that");
             return;
@@ -531,6 +539,27 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         ByteActFrame = BitConverter.GetBytes(IntActFrame);
         Code1fs.Write(ByteActFrame, 0, 2);
 
+        //Grab the byte that determines which parts become active, for now this is just future-proofing
+        Code1fs.Position = Code1fs.Position + 1;
+        Code1fs.ReadExactly(intbuffer, 0, 1);
+        int ActiveParts = BitConverter.ToInt16(intbuffer);
+
+        //Damage Time
+        Code1fs.Position = Code1fs.Position + 1;
+        Code1fs.ReadExactly(intbuffer, 0, 1);
+        Code1fs.Position -= 1;
+        //wait could I have just done -=/+= the whole time
+        Console.WriteLine($"Enter how much damage the move should do (Always Enter it in Decimal)");
+        Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
+        StringActFrame = Console.ReadLine();
+        if (String.IsNullOrEmpty(StringActFrame))
+        {
+            Console.WriteLine($"Null value entered, don't do that");
+            return;
+        }
+        IntActFrame = Convert.ToInt16(StringActFrame);
+        ByteActFrame = BitConverter.GetBytes(IntActFrame);
+        Code1fs.Write(ByteActFrame, 0, 1);
     }
 
     skipped:
@@ -614,8 +643,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
             //Jump to the animation offset, and get the animation length in frames
             Epfs.Seek(FinalOffset, SeekOrigin.Begin);
-            DataBuffer = new byte[3];
-            Epfs.ReadExactly(DataBuffer, 0, 3);
+            DataBuffer = new byte[2];
+            Epfs.ReadExactly(DataBuffer, 0, 2);
 
             MoveLength = BitConverter.ToInt16(DataBuffer, 0);
             Console.WriteLine($"This animation is {MoveLength} frames long!");
@@ -643,9 +672,9 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     Epfs.ReadExactly(FloatBuffer, 0, 4);
                     ConvertedBuffer = BitConverter.ToSingle(FloatBuffer, 0);
                     string FloatBufferString = Convert.ToHexString(FloatBuffer);
-                    Console.WriteLine(FloatBufferString);
+                    //Console.WriteLine(FloatBufferString);
                     float FBuffer = BitConverter.ToSingle(FloatBuffer, 0);
-                    Console.WriteLine(FBuffer);
+                    //Console.WriteLine(FBuffer);
 
 
                     //counter++;
@@ -699,6 +728,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 //Console.WriteLine(DefaultF);
                 EpKeyFrameStuff:
                 //UniqueKeyFrames.Sort();
+                Console.WriteLine($"This animation has {UniqueKeyFrames.Count} unique Key Frames");
+                Console.WriteLine($"These are the unique Key Frame values:");
                 UniqueKeyFrames.ForEach(i => Console.WriteLine(i + ","));
                 NewKeyFramesList = new List<int>();
                 //string NewList;
@@ -745,8 +776,11 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
                 //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
                 //temp fix? I haven't even tested this tbh
-                UniqueKeyFrames.Reverse();
-                NewKeyFramesList.Reverse();
+                if (NewKeyFramesList.Max() > UniqueKeyFrames.Max())
+                {
+                    UniqueKeyFrames.Reverse();
+                    NewKeyFramesList.Reverse();
+                }
 
                 foreach (int NewKeyFrameForReplace in NewKeyFramesList)
                 {
@@ -784,7 +818,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     
                                 //debug
                                 string shitstring = Convert.ToHexString(shitbyte);
-                                Console.WriteLine(shitstring);
+                                //Console.WriteLine(shitstring);
 
                                 //UniqueKeyFrames.ForEach(i => {Console.WriteLine(i.ToString());});
 
@@ -793,14 +827,14 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                             //This can be updated with more accurate code due to the new findings in the "header" part
                             if (ConvertedBuffer > 400)
                             {
-                                Console.WriteLine($"Parsed value too big!!!");
+                                //Console.WriteLine($"Parsed value too big!!!");
                                 ++CurrentKeyFrame;
                                 break;
                                 //I'm so fucking stupid
                                 //ConvertedBuffer = 1;
                             }
                             //debug
-                            Console.WriteLine($"loop");
+                            //Console.WriteLine($"loop");
                         }
             
                     }
