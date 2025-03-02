@@ -4,6 +4,7 @@ string RomPath;
 string DataFilePath;
 string EpFilePath;
 string Code1Path;
+List<int> AlreadyWrittenTo = new List<int>();
 Console.WriteLine($"Just a heads up, this application will make a back-up of your current rom folder");
 Console.WriteLine($"It'll be stored in a folder in the same directory as this application");
 Console.WriteLine($"I'd keep in mind whether your stf_rom folder is modded or not");
@@ -271,6 +272,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //Move the Filestream position back 4 bytes so we include the first keyframe in the list
     fs.Position = (fs.Position - 4);
     long FloatStartPos = fs.Position;
+    List<int> KeyFrameCounter = new List<int>();
     List<int> UniqueKeyFrames = new List<int>();
 
     //the while condition here runs unless the float buffer returns a non-integer value
@@ -335,7 +337,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
             Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
             Console.WriteLine($"This keyframe's old value was {UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1)}");
             string NewKeyFrame = Console.ReadLine();
-            if (NewKeyFrame == null)
+            if (String.IsNullOrEmpty(NewKeyFrame))
             {
                 return;
             }
@@ -368,12 +370,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
     //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
     //temp fix? I haven't even tested this tbh
-    if (NewKeyFramesList.Max() > UniqueKeyFrames.Max())
+    if (NewKeyFramesList.Max() >= UniqueKeyFrames.Max())
     {
         UniqueKeyFrames.Reverse();
         NewKeyFramesList.Reverse();
     }
-
+    
     foreach (int NewKeyFrameForReplace in NewKeyFramesList)
     {
         try
@@ -408,6 +410,21 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     
                     //Overwrites the float with the user entered float from the new list
                     fs.Position = (fs.Position - 4);
+
+                    //Checks if this location has already been written to, and skips it if so
+                    //If this location hasn't been written to, it gets added to a list of locations- 
+                    //-that have been written to, and then the bytes are overwritten.
+                    if (AlreadyWrittenTo.Contains(Convert.ToInt32(fs.Position)))
+                    { 
+                        fs.Position += 4;
+                        //Console.WriteLine(Convert.ToInt32(fs.Position));
+                        continue;
+                    }
+                    else
+                    {
+                        AlreadyWrittenTo.Add(Convert.ToInt32(fs.Position));
+                    }
+
                     fs.Write(shitbyte, 0, 4);
                     
                     //debug
@@ -746,7 +763,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     {
                         Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
                         string NewKeyFrame = Console.ReadLine();
-                        if (NewKeyFrame == null)
+                        if (String.IsNullOrEmpty(NewKeyFrame))
                         {
                             return;
                         }
@@ -776,7 +793,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
                 //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
                 //temp fix? I haven't even tested this tbh
-                if (NewKeyFramesList.Max() > UniqueKeyFrames.Max())
+                //really need to figure out a better way to fix this lol
+                if (NewKeyFramesList.Max() >= UniqueKeyFrames.Max())
                 {
                     UniqueKeyFrames.Reverse();
                     NewKeyFramesList.Reverse();
@@ -814,6 +832,22 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
                                 //Overwrites the float with the user entered float from the new list
                                 Epfs.Position = (Epfs.Position - 4);
+
+
+                                //Checks if this location has already been written to, and breaks if it has
+                                //If this location hasn't been written to, it gets added to a list of locations- 
+                                //-that have been written to, and then the bytes are overwritten.
+                                if (AlreadyWrittenTo.Contains(Convert.ToInt32(fs.Position)))
+                                {
+                                    fs.Position += 4;
+                                    continue;
+                                }
+                                else
+                                {
+                                    AlreadyWrittenTo.Add(Convert.ToInt32(fs.Position));
+                                }
+
+
                                 Epfs.Write(shitbyte, 0, 4);
                     
                                 //debug
