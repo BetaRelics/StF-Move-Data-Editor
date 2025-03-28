@@ -685,7 +685,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Code1fs.Position -= 1;
         //wait could I have just done -=/+= the whole time
         Damage:
-        Console.WriteLine($"Enter how much damage the move should do (Always Enter it in Decimal)");
+        Console.WriteLine($"Enter how much damage the move should do.");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
         StringActFrame = Console.ReadLine();
         if (String.IsNullOrWhiteSpace(StringActFrame))
@@ -973,7 +973,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     catch
                     {
                         Console.WriteLine($"Something went wrong, failed to read the entered keyframe");
-                        Console.WriteLine($"Start from the top");
+                        Console.WriteLine($"Start from the top {Environment.NewLine}");
                         //NewKeyFramesList.Remove(CurrentKeyFrame);
                         goto EpKeyFrameStuff;
                     }
