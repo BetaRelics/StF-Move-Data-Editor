@@ -4,6 +4,8 @@ string RomPath;
 string DataFilePath;
 string EpFilePath;
 string Code1Path;
+int ChangeBy = 0;
+bool ChangeAll = false;
 List<int> AlreadyWrittenTo = new List<int>();
 Console.WriteLine($"Just a heads up, this application will make a back-up of your current rom folder");
 Console.WriteLine($"It'll be stored in a folder in the same directory as this application");
@@ -12,7 +14,7 @@ Console.WriteLine($"Enter stf_rom folder Path");
 //Console.WriteLine(Directory.GetCurrentDirectory());
 RomPath = Console.ReadLine();
 
-if (string.IsNullOrEmpty(RomPath))
+if (String.IsNullOrWhiteSpace(RomPath))
 {
     Console.WriteLine("null value entered.");
     Console.WriteLine($"Starting the program from the beginning...");
@@ -38,11 +40,12 @@ if (!dir.Exists)
 
 if (Directory.Exists(FolderForBackup))
 {
-    Console.WriteLine($"A backup folder was found, do you wish to overwrite it? type 'y' for yes, or 'n' for no");
+    Console.WriteLine($"A backup folder was found, do you wish to overwrite it? type 'y' for yes, or 'n' for no.");
+    Console.WriteLine($"If you wish to restore the backup, type 'r' and hit enter");
     string PathResponse = Console.ReadLine();
-    if (String.IsNullOrEmpty(PathResponse))
+    if (String.IsNullOrWhiteSpace(PathResponse))
     {
-        Console.WriteLine($"Null value entered, returning to start");
+        Console.WriteLine($"Null value entered, restarting the program");
         goto Start;
     }
     if (PathResponse == "n")
@@ -53,9 +56,18 @@ if (Directory.Exists(FolderForBackup))
     {
         goto CreateBackup;
     }
+    else if (PathResponse == "r")
+    {
+        var backdir = new DirectoryInfo(FolderForBackup);
+        foreach (FileInfo BackFile in backdir.GetFiles())
+        {
+            File.Copy(BackFile.FullName, Path.Combine(RomPath, BackFile.Name), true);
+            goto PathCombining;
+        }
+    }
     else
     {
-        Console.WriteLine($"Reponse not recognized, did you enter lowercase 'y' or 'n'?");
+        Console.WriteLine($"Reponse not recognized, did you enter lowercase 'y' , 'n' or 'r'?");
         Console.WriteLine($"Press any key and hit enter to return to the start of the program");
         Console.ReadLine();
         goto Start;
@@ -98,13 +110,13 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     int CalculatedOffset;
     Console.WriteLine($"Before we start, do you wish to enter the move ID in hex? type 'y' for yes, or 'n' for no, and hit enter");
     HexQuery = Console.ReadLine();
-    if (HexQuery == null)
+    if (String.IsNullOrWhiteSpace(HexQuery))
     {
-        goto Start;
+        Console.WriteLine("No response detected, proceeding with Decimal Mode");
     }
     else if (HexQuery == "y")
     {
-        Console.WriteLine($"Hex mode enabled");
+        Console.WriteLine($"Hex Mode enabled");
         HexMode = true;
     }
     else if (HexQuery == "n")
@@ -121,10 +133,10 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     Console.WriteLine("Enter the ID of the move whose data you wish to access");
     MoveIDEntered = Console.ReadLine();
 
-    if (MoveIDEntered == null)
+    if (String.IsNullOrWhiteSpace(MoveIDEntered))
     {
-        Console.WriteLine("null value entered. Why would you do that?");
-        return;
+        Console.WriteLine("No ID detected, try entering the ID again");
+        goto RequestID;
     }
    
 
@@ -194,7 +206,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //Jump to the offset, and store the position.
     fs.Seek(FinalOffset, SeekOrigin.Begin);
     var DataPos = fs.Position;
-
+    //Console.WriteLine($"{FinalOffset} {DataPos}");
     //Go to the internal name table and find the address of the move's name
     byte[] NameAddress = new byte[3];
     fs.Seek(CalculatedOffset + 0x120738, SeekOrigin.Begin);
@@ -229,7 +241,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     string Name = Encoding.UTF8.GetString(NameAllBytes);
     Console.WriteLine($"This animation is named {Name}");
     //Console.WriteLine(FinalNameOffset);
-
+    Console.WriteLine($"This animation is located at 0x{FinalOffset:X} in rom_data");
     fs.Seek(FinalOffset, SeekOrigin.Begin);
     byte[] DataBuffer = new byte[2];
     fs.ReadExactly(DataBuffer, 0, 2);
@@ -272,11 +284,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     //Move the Filestream position back 4 bytes so we include the first keyframe in the list
     fs.Position = (fs.Position - 4);
     long FloatStartPos = fs.Position;
+    //Console.WriteLine($"{FloatStartPos} {fs.Position}");
     List<int> KeyFrameCounter = new List<int>();
     List<int> UniqueKeyFrames = new List<int>();
 
-    //the while condition here runs unless the float buffer returns a non-integer value
-    //the check against float.Epsilon accounts for miniscule rounding errors
+    //The while condition here runs unless the float buffer returns a non-integer value
+    //The check against float.Epsilon accounts for miniscule rounding errors
     while ((ConvertedBuffer % 1) < float.Epsilon)
     {
         fs.ReadExactly(FloatBuffer, 0, 4);
@@ -289,11 +302,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         }
 
         //following the keyframe list, there's typically some bytes that are equal to very large/small integers
-        //by checking the float's absolute value against 400, we ensure we aren't accidentally reading those
-        //logically, no move should ever be 400 frames long, so this solution shouldn't be an issue
+        //by checking the float's absolute value against 600, we ensure we aren't accidentally reading those
+        //logically, no move should ever be 600 frames long, so this solution shouldn't be an issue
         //there's definitely a better way to do this though
+        //We also check to make sure the float is a whole number that isn't negative 
         //This can be updated due to the new findings in the "header" part
-        if (Math.Abs(ConvertedBuffer) > 400)
+        if (Math.Abs(ConvertedBuffer) > 600 || ConvertedBuffer < 0 || ConvertedBuffer % 1 != 0)
         {
             break;
         }
@@ -323,10 +337,14 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     List<int> NewKeyFramesList = new List<int>();
     //string NewList;
     int CurrentKeyFrame = 1;
-    Console.WriteLine($"Please enter what you'd like to swap these frame timings to");
-    Console.WriteLine($"Enter one number at a time, in the order they appeared in before");
-    Console.WriteLine($"Keep in mind entering the same number for multiple frames will result in-");
-    Console.WriteLine($"-there being fewer unique keyframes, which may not be ideal");
+    ChangeBy = 0;
+    ChangeAll = false;
+    int KeyFrameForReplace;
+    Console.WriteLine($"Please enter what you'd like to swap these frame timings to.");
+    Console.WriteLine($"Enter one number at a time, in the order they appeared in before.");
+    Console.WriteLine($"If you enter nothing, the keyframe's original value will be used.");
+    Console.WriteLine($"If you enter 'All', 'all', or 'a', you will be prompted to enter another value.");
+    Console.WriteLine($"The remaining keyframes will then be computed by adding this value to their original value.");
     //Console.WriteLine($"Make sure the);
 
     //This is the part that allows the user to make a list of their own keyframes
@@ -334,47 +352,129 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     {
         try
         {
+            if (ChangeAll == true)
+            {
+                //NewKeyFramesList.Clear();
+                foreach (int i in UniqueKeyFrames)
+                {
+                    //Allows it to skip any already set keyframes
+                    if (UniqueKeyFrames.IndexOf(i) < CurrentKeyFrame - 1)
+                    {
+                        continue;
+                    }
+                    //We always want to keep the first keyframe value equal to 1.
+                    //This is because its both how all the other animations work,
+                    //and because this program operates based on finding that first keyframe of 1
+                    if (i == 1)
+                    {
+                        NewKeyFramesList.Add(1);
+                    }
+                    else
+                    {
+                        if ((i + ChangeBy) < 1)
+                        {
+                            Console.WriteLine($"One of the new computed keyframes is less than 1. Let's try again. {Environment.NewLine}");
+                            goto KeyFrameStuff;
+                        }
+                        NewKeyFramesList.Add(i + ChangeBy);
+                        //Console.WriteLine(ChangeBy);
+                    }
+                }
+                break;
+            }
             Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
             Console.WriteLine($"This keyframe's old value was {UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1)}");
-            string NewKeyFrame = Console.ReadLine();
-            if (String.IsNullOrEmpty(NewKeyFrame))
+            //We always want to keep the first keyframe value equal to 1.
+            //This is because its both how all the other animations work,
+            //and because this program operates based on finding that first keyframe of 1
+            if (UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1) == 1 || (CurrentKeyFrame == 1))
             {
-                return;
+                Console.WriteLine($"It is highly recommended that you keep the first Keyframe set to 1");
             }
-            int KeyFrameForReplace = Convert.ToInt16(NewKeyFrame);
-            NewKeyFramesList.Add(KeyFrameForReplace);
-            ++CurrentKeyFrame;
+            string NewKeyFrame = Console.ReadLine();
+            if (String.IsNullOrWhiteSpace(NewKeyFrame))
+            {
+                KeyFrameForReplace = UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1);
+                Console.WriteLine($"{KeyFrameForReplace}");
+                NewKeyFramesList.Add(KeyFrameForReplace);
+                ++CurrentKeyFrame;
+            }
+            else if (NewKeyFrame.Contains($"Restart") || NewKeyFrame.Contains($"restart"))
+            {
+                fs.Dispose();
+                Console.WriteLine($"Restarting the program... {Environment.NewLine} {Environment.NewLine}");
+                await Task.Delay(10000);
+                goto Start;
+            }
+            else if (NewKeyFrame.Contains($"all") || NewKeyFrame.Contains($"All") || NewKeyFrame.Contains($"a"))
+            {
+                Console.WriteLine($"Enter what value to add to all of the remaining keyframes");
+                string ChangeInt = Console.ReadLine();
+                if (String.IsNullOrWhiteSpace(ChangeInt))
+                {
+                    KeyFrameForReplace = UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1);
+                    Console.WriteLine($"{KeyFrameForReplace}");
+                    NewKeyFramesList.Add(KeyFrameForReplace);
+                    ++CurrentKeyFrame;
+                    continue;
+                }
+                if (CurrentKeyFrame - 1== 0)
+                {
+                    NewKeyFramesList.Add(1);
+                    ChangeBy = Convert.ToInt16(ChangeInt);
+                    ++CurrentKeyFrame;
+                    ChangeAll = true;
+                }
+                else
+                {
+                    ChangeBy = Convert.ToInt16(ChangeInt);
+                    KeyFrameForReplace = (UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1) + ChangeBy);
+                    NewKeyFramesList.Add(KeyFrameForReplace);
+                    ++CurrentKeyFrame;
+                    ChangeAll = true;
+                    continue;
+                }
+            }
+            else
+            {
+                KeyFrameForReplace = Convert.ToInt16(NewKeyFrame);
+                NewKeyFramesList.Add(KeyFrameForReplace);
+                ++CurrentKeyFrame;
+            }
         }
 
         catch
         {
             Console.WriteLine($"Something went wrong, failed to read the entered keyframe");
-            Console.WriteLine($"Try again");
-            NewKeyFramesList.Remove(CurrentKeyFrame);
-            Console.WriteLine(NewKeyFramesList.Count);
-            Console.WriteLine("Start from the top");
+            //Console.WriteLine($"Try again");
+            //NewKeyFramesList.RemoveAt(CurrentKeyFrame - 1);
+            //Console.WriteLine(NewKeyFramesList.Count);
+            Console.WriteLine($"Start from the top {Environment.NewLine}");
             goto KeyFrameStuff;
         }
     }
     //int OldListLength = UniqueKeyFrames.Count;
     //int NewListLength = NewKeyFrames.Count;
+    //Console.WriteLine($"Original List:{UniqueKeyFrames.Count}, New List:{NewKeyFramesList.Count}");
     if (UniqueKeyFrames.Count - NewKeyFramesList.Count != 0)
     {
         Console.WriteLine($"Error! List lengths do not match!");
+        Console.WriteLine($"Original List:{UniqueKeyFrames.Count}, New List:{NewKeyFramesList.Count}");
         return;
     }
 
+    Console.WriteLine($"Your new keyframes are:");
+    NewKeyFramesList.ForEach(i => Console.WriteLine(i + ","));
+    Console.WriteLine($"Are these values satisfactory? Type 'n' and hit enter if they are not. If they are satisfactory, just hit enter.");
+    string Satisfaction = Console.ReadLine();
+    if (Satisfaction == "n")
+    {
+        Console.WriteLine($"No? How about we try again then. {Environment.NewLine}");
+        goto KeyFrameStuff;
+    }
     ConvertedBuffer = 0;
     CurrentKeyFrame = 0;
 
-
-    //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
-    //temp fix? I haven't even tested this tbh
-    if (NewKeyFramesList.Max() >= UniqueKeyFrames.Max())
-    {
-        UniqueKeyFrames.Reverse();
-        NewKeyFramesList.Reverse();
-    }
     
     foreach (int NewKeyFrameForReplace in NewKeyFramesList)
     {
@@ -399,7 +499,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 float shitfloat = Convert.ToSingle(shit);
                 byte[] shitbyte = BitConverter.GetBytes(shitfloat);
                 //Console.WriteLine(piss);
-                
+
                 //Hits if the float matches one of the original keyframes
                 if (ConvertedBuffer == pissfloat)
                 {
@@ -407,15 +507,14 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     //Console.WriteLine(test);
 
 
-                    
-                    //Overwrites the float with the user entered float from the new list
+
                     fs.Position = (fs.Position - 4);
 
-                    //Checks if this location has already been written to, and skips it if so
+                    //Checks if this location has already been written to, and skips writing if it was.
                     //If this location hasn't been written to, it gets added to a list of locations- 
                     //-that have been written to, and then the bytes are overwritten.
                     if (AlreadyWrittenTo.Contains(Convert.ToInt32(fs.Position)))
-                    { 
+                    {
                         fs.Position += 4;
                         //Console.WriteLine(Convert.ToInt32(fs.Position));
                         continue;
@@ -424,19 +523,18 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     {
                         AlreadyWrittenTo.Add(Convert.ToInt32(fs.Position));
                     }
-
+                    //Overwrites the float with the user entered float from the new list
                     fs.Write(shitbyte, 0, 4);
-                    
                     //debug
                     //string shitstring = Convert.ToHexString(shitbyte);
                     //Console.WriteLine(shitstring);
 
-                    //UniqueKeyFrames.ForEach(i => {Console.WriteLine(i.ToString());});
+                    
 
                 }
                 //Should only hit when the stream goes past the floats
                 //This can be updated with more accurate code due to the new findings in the "header" part
-                if (ConvertedBuffer > 400)
+                if (ConvertedBuffer > 600 || ConvertedBuffer < 0 || ConvertedBuffer % 1 != 0)
                 {
                     //Console.WriteLine($"Parsed value too big!!!");
                     ++CurrentKeyFrame;
@@ -459,11 +557,19 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         
 
     }
-
+    SetEndFrame:
     Console.WriteLine($"Please enter what frame the animation ends on");
     Console.WriteLine($"The animation previously ended on frame {MoveLength}");
     Console.WriteLine($"(I recommend just making it the highest value you entered, which was {NewKeyFramesList.Max()})");
-    int EndingFrame = Convert.ToInt16( Console.ReadLine() );
+    string EndingFrameString = Console.ReadLine();
+    if (String.IsNullOrWhiteSpace(EndingFrameString))
+    {
+        EndingFrameString = NewKeyFramesList.Max().ToString();
+        Console.WriteLine($"{EndingFrameString}");
+        //Console.WriteLine($"Null value entered, try entering your value again.");
+        //goto SetEndFrame;
+    }
+    int EndingFrame = Convert.ToInt16(EndingFrameString);
     fs.Position = FinalOffset;
     byte[] EndingFrameBytes = new byte[2];
     EndingFrameBytes = BitConverter.GetBytes(EndingFrame);
@@ -481,7 +587,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
     Code1Handling:
     using (FileStream Code1fs = File.Open(Code1Path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
     {
-        Code1fs.Seek(CalculatedOffset + 0xCE380, 0);
+        Code1fs.Seek(CalculatedOffset + 0xCE380, SeekOrigin.Begin);
         Code1fs.ReadExactly(AddressBuffer, 0, 3);
         //string hexbuff = Convert.ToHexString(AddressBuffer);
         //Console.WriteLine(hexbuff);
@@ -500,8 +606,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         {
             return;
         }
-        Code1fs.Seek(FinalOffset, 0);
-
+        Code1fs.Seek(FinalOffset, SeekOrigin.Begin);
+        Console.WriteLine($"{Environment.NewLine} {Name}'s move data is located at 0x{FinalOffset:X} in rom_code1");
         //Active Frame Start (if the move has active frames)
         Code1fs.Position = Code1fs.Position + 14;
         byte[] intbuffer = new byte[2];
@@ -509,13 +615,17 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         //Code1fs.ReadExactly(intbuffer, 0, 2);
         Code1fs.ReadExactly(intbuffer, 0, 2);
         Code1fs.Position = Code1fs.Position - 2;
+        ActiveFrameStart:
         Console.WriteLine($"Enter what frame you want the move to become active on");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}(?)");
         Console.WriteLine($"If the move you're modifying doesn't have active frames, type 'skip' and hit enter");
         string StringActFrame = Console.ReadLine();
-        if (StringActFrame == null)
+        if (String.IsNullOrWhiteSpace(StringActFrame))
         {
-            return;
+            int convertedintbuffer = BitConverter.ToInt16(intbuffer);
+            StringActFrame = convertedintbuffer.ToString();
+            //Console.WriteLine($"Null value entered, try entering your value again.");
+            //goto ActiveFrameStart;
         }
         if (StringActFrame == "skip")
         {
@@ -530,12 +640,16 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
         Code1fs.ReadExactly(intbuffer, 0, 2);
         Code1fs.Position = Code1fs.Position - 2;
+        ActiveFrameStop:
         Console.WriteLine($"Enter what frame you want the move to stop being active on");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
         StringActFrame = Console.ReadLine();
-        if (StringActFrame == null)
+        if (String.IsNullOrWhiteSpace(StringActFrame))
         {
-            return;
+            int convertedintbuffer = BitConverter.ToInt16(intbuffer);
+            StringActFrame = convertedintbuffer.ToString();
+            //Console.WriteLine($"Null value entered, try entering your value again.");
+            //goto ActiveFrameStop;
         }
         IntActFrame = Convert.ToInt16(StringActFrame);   
         ByteActFrame = BitConverter.GetBytes(IntActFrame);
@@ -544,13 +658,17 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
 
         Code1fs.ReadExactly(intbuffer, 0, 2);
         Code1fs.Position = Code1fs.Position - 2;
+        EndFrame:
         Console.WriteLine($"Enter the frame the move ends on");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
+        Console.WriteLine($"For reference, you set the animation to end on frame {EndingFrame}");
         StringActFrame = Console.ReadLine();
-        if (String.IsNullOrEmpty(StringActFrame))
+        if (String.IsNullOrWhiteSpace(StringActFrame))
         {
-            Console.WriteLine($"Null value entered, don't do that");
-            return;
+            int convertedintbuffer = BitConverter.ToInt16(intbuffer);
+            StringActFrame = convertedintbuffer.ToString();
+            //Console.WriteLine($"Null value entered, try entering your value again.");
+            //goto EndFrame;
         }
         IntActFrame = Convert.ToInt16(StringActFrame);
         ByteActFrame = BitConverter.GetBytes(IntActFrame);
@@ -566,13 +684,14 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         Code1fs.ReadExactly(intbuffer, 0, 1);
         Code1fs.Position -= 1;
         //wait could I have just done -=/+= the whole time
+        Damage:
         Console.WriteLine($"Enter how much damage the move should do (Always Enter it in Decimal)");
         Console.WriteLine($"Original value was {BitConverter.ToInt16(intbuffer)}");
         StringActFrame = Console.ReadLine();
-        if (String.IsNullOrEmpty(StringActFrame))
+        if (String.IsNullOrWhiteSpace(StringActFrame))
         {
-            Console.WriteLine($"Null value entered, don't do that");
-            return;
+            Console.WriteLine($"Null value entered, try entering your value again.");
+            goto Damage;
         }
         IntActFrame = Convert.ToInt16(StringActFrame);
         ByteActFrame = BitConverter.GetBytes(IntActFrame);
@@ -657,7 +776,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
             Name = Encoding.UTF8.GetString(NameAllBytes);
             Console.WriteLine($"This animation is named {Name}");
 
-
+            Console.WriteLine($"This animation is located at 0x{FinalOffset:X} in rom_ep");
             //Jump to the animation offset, and get the animation length in frames
             Epfs.Seek(FinalOffset, SeekOrigin.Begin);
             DataBuffer = new byte[2];
@@ -702,8 +821,8 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 FloatStartPos = Epfs.Position;
                 UniqueKeyFrames = new List<int>();
 
-                //the while condition here runs unless the float buffer returns a non-integer value
-                //the check against float.Epsilon accounts for miniscule rounding errors
+                //The while condition here runs unless the float buffer returns a non-integer value
+                //The check against float.Epsilon accounts for miniscule rounding errors
                 while ((ConvertedBuffer % 1) < float.Epsilon)
                 {
                     Epfs.ReadExactly(FloatBuffer, 0, 4);
@@ -716,11 +835,12 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                     }
 
                     //following the keyframe list, there's typically some bytes that are equal to very large/small integers
-                    //by checking the float's absolute value against 400, we ensure we aren't accidentally reading those
-                    //logically, no move should ever be 400 frames long, so this solution shouldn't be an issue
+                    //by checking the float's absolute value against 600, we ensure we aren't accidentally reading those
+                    //logically, no move should ever be 600 frames long, so this solution shouldn't be an issue
                     //there's definitely a better way to do this though
+                    //We also check to make sure the float is a whole number that isn't negative 
                     //This can be updated due to the new findings in the "header" part
-                    if (Math.Abs(ConvertedBuffer) > 400)
+                    if (Math.Abs(ConvertedBuffer) > 600 || ConvertedBuffer < 0 || ConvertedBuffer % 1 != 0)
                     {
                         break;
                     }
@@ -751,32 +871,110 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 NewKeyFramesList = new List<int>();
                 //string NewList;
                 CurrentKeyFrame = 1;
-                Console.WriteLine($"Please enter what you'd like to swap these frame timings to");
-                Console.WriteLine($"Enter one number at a time, in the order they appeared in before");
-                Console.WriteLine($"Keep in mind entering the same number for multiple frames will result in-");
-                Console.WriteLine($"-there being fewer unique keyframes, which may not be ideal");
+                ChangeBy = 0;
+                ChangeAll = false;
+                Console.WriteLine($"Please enter what you'd like to swap these frame timings to.");
+                Console.WriteLine($"Enter one number at a time, in the order they appeared in before.");
+                Console.WriteLine($"If you enter nothing, the keyframe's original value will be used.");
+                Console.WriteLine($"If you enter 'All', 'all', or 'a', you will be prompted to enter another value.");
+                Console.WriteLine($"The remaining keyframes will then be computed by adding this value to their original value.");
 
                 //This is the part that allows the user to make a list of their own keyframes
                 foreach (int KeyFrame in UniqueKeyFrames)
                 {
                     try
                     {
-                        Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
-                        string NewKeyFrame = Console.ReadLine();
-                        if (String.IsNullOrEmpty(NewKeyFrame))
+                        if (ChangeAll == true)
                         {
-                            return;
+                            //NewKeyFramesList.Clear();
+                            foreach (int i in UniqueKeyFrames)
+                            {
+                                //Allows it to skip any already set keyframes
+                                if (UniqueKeyFrames.IndexOf(i) < CurrentKeyFrame - 1)
+                                {
+                                    continue;
+                                }
+                                //We always want to keep the first keyframe value equal to 1.
+                                //This is because its both how all the other animations work,
+                                //and because this program operates based on finding that first keyframe of 1
+                                if (i == 1)
+                                {
+                                    NewKeyFramesList.Add(1);
+                                }
+                                else
+                                {
+                                    if ((i + ChangeBy) < 1)
+                                    {
+                                        Console.WriteLine($"One of the new computed keyframes is less than 1. Let's try again. {Environment.NewLine}");
+                                        goto EpKeyFrameStuff;
+                                    }
+                                    NewKeyFramesList.Add(i + ChangeBy);
+                                    //Console.WriteLine(ChangeBy);
+                                }
+                            }
+                            break;
                         }
-                        int KeyFrameForReplace = Convert.ToInt16(NewKeyFrame);
-                        NewKeyFramesList.Add(KeyFrameForReplace);
-                        ++CurrentKeyFrame;
+                        Console.WriteLine($"Enter keyframe {CurrentKeyFrame}");
+                        Console.WriteLine($"This keyframe's old value was {UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1)}");
+                        if (UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1) == 1 || (CurrentKeyFrame == 1))
+                        {
+                            Console.WriteLine($"It is highly recommended that you keep the first Keyframe set to 1");
+                        }
+                        string NewKeyFrame = Console.ReadLine();
+                        if (String.IsNullOrWhiteSpace(NewKeyFrame))
+                        {
+                            KeyFrameForReplace = UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1);
+                            Console.WriteLine($"{KeyFrameForReplace}");
+                            NewKeyFramesList.Add(KeyFrameForReplace);
+                            ++CurrentKeyFrame;
+                        }
+                        else if (NewKeyFrame.Contains($"Restart") || NewKeyFrame.Contains($"restart"))
+                        {
+                            Epfs.Dispose();
+                            goto Start;
+                        }
+                        else if (NewKeyFrame.Contains($"all") || NewKeyFrame.Contains($"All") || NewKeyFrame.Contains($"a"))
+                        {
+                            Console.WriteLine($"Enter what value to add to all of the remaining keyframes");
+                            string ChangeInt = Console.ReadLine();
+                            if (String.IsNullOrWhiteSpace(ChangeInt))
+                            {
+                                KeyFrameForReplace = UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1);
+                                Console.WriteLine($"{KeyFrameForReplace}");
+                                NewKeyFramesList.Add(KeyFrameForReplace);
+                                ++CurrentKeyFrame;
+                                continue;
+                            }
+                            if (CurrentKeyFrame - 1 == 0)
+                            {
+                                NewKeyFramesList.Add(1);
+                                ChangeBy = Convert.ToInt16(ChangeInt);
+                                ++CurrentKeyFrame;
+                                ChangeAll = true;
+                            }
+                            else
+                            {
+                                ChangeBy = Convert.ToInt16(ChangeInt);
+                                KeyFrameForReplace = (UniqueKeyFrames.ElementAt(CurrentKeyFrame - 1) + ChangeBy);
+                                NewKeyFramesList.Add(KeyFrameForReplace);
+                                ++CurrentKeyFrame;
+                                ChangeAll = true;
+                            }
+                            continue;
+                        }
+                        else
+                        {
+                            KeyFrameForReplace = Convert.ToInt16(NewKeyFrame);
+                            NewKeyFramesList.Add(KeyFrameForReplace);
+                            ++CurrentKeyFrame;
+                        }
                     }
 
                     catch
                     {
                         Console.WriteLine($"Something went wrong, failed to read the entered keyframe");
-                        Console.WriteLine($"Try again");
-                        NewKeyFramesList.Remove(CurrentKeyFrame);
+                        Console.WriteLine($"Start from the top");
+                        //NewKeyFramesList.Remove(CurrentKeyFrame);
                         goto EpKeyFrameStuff;
                     }
                 }
@@ -785,20 +983,23 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                 if (UniqueKeyFrames.Count - NewKeyFramesList.Count != 0)
                 {
                     Console.WriteLine($"Error! List lengths do not match!");
+                    Console.WriteLine($"Original List:{UniqueKeyFrames.Count}, New List:{NewKeyFramesList.Count}");
                     return;
+                }
+
+                Console.WriteLine($"Your new keyframes are:");
+                NewKeyFramesList.ForEach(i => Console.WriteLine(i + ","));
+                Console.WriteLine($"Are these values satisfactory? Type 'n' and hit enter if they are not. If they are satisfactory, just hit enter.");
+                Satisfaction = Console.ReadLine();
+                if (Satisfaction == "n")
+                {
+                    Console.WriteLine($"No? How about we try again then. {Environment.NewLine}");
+                    goto EpKeyFrameStuff;
                 }
 
                 ConvertedBuffer = 0;
                 CurrentKeyFrame = 0;
 
-                //By reversing the lists, we somewhat avoid overwriting earlier keyframes with later ones
-                //temp fix? I haven't even tested this tbh
-                //really need to figure out a better way to fix this lol
-                if (NewKeyFramesList.Max() >= UniqueKeyFrames.Max())
-                {
-                    UniqueKeyFrames.Reverse();
-                    NewKeyFramesList.Reverse();
-                }
 
                 foreach (int NewKeyFrameForReplace in NewKeyFramesList)
                 {
@@ -822,7 +1023,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                             var shit = NewKeyFramesList[CurrentKeyFrame];
                             float shitfloat = Convert.ToSingle(shit);
                             byte[] shitbyte = BitConverter.GetBytes(shitfloat);
-                            Console.WriteLine(piss);
+                            //Console.WriteLine(piss);
                 
                             //Hits if the float matches one of the original keyframes
                             if (ConvertedBuffer == pissfloat)
@@ -830,24 +1031,23 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                                 //string test = BitConverter.ToString(pissbyte);
                                 //Console.WriteLine(test);
 
-                                //Overwrites the float with the user entered float from the new list
                                 Epfs.Position = (Epfs.Position - 4);
 
 
-                                //Checks if this location has already been written to, and breaks if it has
+                                //Checks if this location has already been written to, and skips writing if it was.
                                 //If this location hasn't been written to, it gets added to a list of locations- 
                                 //-that have been written to, and then the bytes are overwritten.
-                                if (AlreadyWrittenTo.Contains(Convert.ToInt32(fs.Position)))
+                                if (AlreadyWrittenTo.Contains(Convert.ToInt32(Epfs.Position)))
                                 {
-                                    fs.Position += 4;
+                                    Epfs.Position += 4;
                                     continue;
                                 }
                                 else
                                 {
-                                    AlreadyWrittenTo.Add(Convert.ToInt32(fs.Position));
+                                    AlreadyWrittenTo.Add(Convert.ToInt32(Epfs.Position));
                                 }
 
-
+                                //Overwrites the float with the user entered float from the new list
                                 Epfs.Write(shitbyte, 0, 4);
                     
                                 //debug
@@ -859,7 +1059,7 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
                             }
                             //Should only hit when the stream goes past the floats
                             //This can be updated with more accurate code due to the new findings in the "header" part
-                            if (ConvertedBuffer > 400)
+                            if (ConvertedBuffer > 600 || ConvertedBuffer < 0 || ConvertedBuffer % 1 != 0)
                             {
                                 //Console.WriteLine($"Parsed value too big!!!");
                                 ++CurrentKeyFrame;
@@ -882,11 +1082,19 @@ using (FileStream fs = File.Open(DataFilePath, FileMode.Open, FileAccess.ReadWri
         
 
                 }
-
+                SetEpEndFrame:
                 Console.WriteLine($"Please enter what frame the animation ends on");
                 Console.WriteLine($"The animation previously ended on frame {MoveLength}");
                 Console.WriteLine($"(I recommend just making it the highest value you entered, which was {NewKeyFramesList.Max()})");
-                EndingFrame = Convert.ToInt16( Console.ReadLine() );
+                EndingFrameString = Console.ReadLine();
+                if (String.IsNullOrWhiteSpace(EndingFrameString))
+                {
+                    EndingFrameString = NewKeyFramesList.Max().ToString();
+                    Console.WriteLine($"{EndingFrameString}");
+                    //Console.WriteLine($"Null value entered, try entering your value again.");
+                    //goto SetEpEndFrame;
+                }
+                EndingFrame = Convert.ToInt16(EndingFrameString);
                 Epfs.Position = FinalOffset;
                 EndingFrameBytes = new byte[2];
                 EndingFrameBytes = BitConverter.GetBytes(EndingFrame);
