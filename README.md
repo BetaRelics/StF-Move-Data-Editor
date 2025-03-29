@@ -28,3 +28,9 @@ A simple command-line application that lets you manipulate the frame data and/or
 2. Extract it to wherever you please.
 3. Open the command-line/terminal there, and run the command `dotnet MoveDataEditor2.dll`
 4. Follow the instructions in the command-line window.
+
+
+
+## Helpful Links
+- Incomplete Document that has a section containing an incomplete list of StF Move IDs: [StF Move Data Doc](https://docs.google.com/document/d/1ka7bHfrrXeuE8BEqqywse_oOVio-eGoawo3nnEjebqI/edit?usp=sharing)
+
