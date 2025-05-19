@@ -21,7 +21,7 @@ A simple command-line application that lets you manipulate the frame data and/or
 3. Run the MoveDataEditor2 Application that's in the extracted folder.
 4. Follow the instructions in the command-line window.
 
-*(BTW, if you're on Windows, you can copy your stf_rom path by shift+right-clicking it in file explorer and selecting "copy as path"*
+*(BTW, if you're on Windows, you can copy your stf_rom path by shift+right-clicking it in file explorer and selecting "copy as path")*
 
 ### MacOS
 1. Download the release zip.
